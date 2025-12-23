@@ -9,7 +9,7 @@ class Trcloud {
             icon: 'file:trcloud.svg',
             group: ['transform'],
             version: 1,
-            subtitle: '={{$parameter["method"] + " " + $parameter["baseUrl"] + $parameter["midPath"] + $parameter["endpointPath"]}}',
+            subtitle: 'HTTP Request',
             description: 'Make an HTTP request to any Trcloud endpoint',
             defaults: {
                 name: 'Trcloud',
@@ -26,40 +26,6 @@ class Trcloud {
                         { name: 'GET', value: 'GET' },
                     ],
                     default: 'POST',
-                },
-                {
-                    displayName: 'Import from cURL',
-                    name: 'useCurl',
-                    type: 'boolean',
-                    default: false,
-                    description: 'Toggle to import request details from a cURL command',
-                },
-                {
-                    displayName: 'cURL Command',
-                    name: 'curlCommand',
-                    type: 'string',
-                    typeOptions: {
-                        rows: 3,
-                    },
-                    default: '',
-                    description: 'Optional cURL command to import (method, URL, headers, and body will be parsed)',
-                    displayOptions: {
-                        show: {
-                            useCurl: [true],
-                        },
-                    },
-                },
-                {
-                    displayName: 'Apply cURL',
-                    name: 'applyCurl',
-                    type: 'boolean',
-                    default: false,
-                    description: 'Enable to apply the cURL command to this request (method, URL, headers, body)',
-                    displayOptions: {
-                        show: {
-                            useCurl: [true],
-                        },
-                    },
                 },
                 {
                     displayName: 'Base URL',
@@ -82,7 +48,7 @@ class Trcloud {
                     displayName: 'Endpoint Path',
                     name: 'endpointPath',
                     type: 'string',
-                    default: 'so/read.php',
+                    default: '',
                     placeholder: 'so/read.php',
                     required: true,
                     description: 'Document/action path, e.g. so/read.php',
@@ -91,7 +57,7 @@ class Trcloud {
                     displayName: 'Send Headers',
                     name: 'sendHeaders',
                     type: 'boolean',
-                    default: false,
+                    default: true,
                 },
                 {
                     displayName: 'Headers',
@@ -101,7 +67,14 @@ class Trcloud {
                         multipleValues: true,
                     },
                     placeholder: 'Add Header',
-                    default: {},
+                    default: {
+                        parameters: [
+                            {
+                                name: 'Origin',
+                                value: '',
+                            },
+                        ],
+                    },
                     displayOptions: {
                         show: {
                             sendHeaders: [true],
@@ -116,13 +89,14 @@ class Trcloud {
                                     displayName: 'Name',
                                     name: 'name',
                                     type: 'string',
-                                    default: '',
+                                    default: 'Origin',
                                 },
                                 {
                                     displayName: 'Value',
                                     name: 'value',
                                     type: 'string',
                                     default: '',
+                                    placeholder: 'http://localhost',
                                 },
                             ],
                         },
@@ -132,7 +106,7 @@ class Trcloud {
                     displayName: 'Send Body',
                     name: 'sendBody',
                     type: 'boolean',
-                    default: false,
+                    default: true,
                     displayOptions: {
                         show: {
                             method: ['POST'],
@@ -173,7 +147,14 @@ class Trcloud {
                         multipleValues: true,
                     },
                     placeholder: 'Add Parameter',
-                    default: {},
+                    default: {
+                        parameters: [
+                            {
+                                name: 'json',
+                                value: '',
+                            },
+                        ],
+                    },
                     options: [
                         {
                             name: 'parameters',
@@ -230,8 +211,8 @@ class Trcloud {
         };
     }
     async execute() {
-        var _a, _b, _c, _d, _e;
-        var _f, _g;
+        var _a, _b;
+        var _c, _d;
         const items = this.getInputData();
         const returnData = [];
         for (let i = 0; i < items.length; i++) {
@@ -239,27 +220,11 @@ class Trcloud {
             const baseUrl = this.getNodeParameter('baseUrl', i);
             const midPath = this.getNodeParameter('midPath', i);
             const endpointPath = this.getNodeParameter('endpointPath', i);
-            const urlParam = buildTrcloudUrl(baseUrl, midPath, endpointPath);
-            const useCurl = this.getNodeParameter('useCurl', i, false);
-            const applyCurl = this.getNodeParameter('applyCurl', i, false);
-            const curlCommand = useCurl
-                ? (this.getNodeParameter('curlCommand', i, '') || '').trim()
-                : '';
+            const url = buildTrcloudUrl(baseUrl, midPath, endpointPath);
             const sendHeaders = this.getNodeParameter('sendHeaders', i, false);
             const headers = this.getNodeParameter('headers', i, {});
-            let method = methodParam;
-            let url = urlParam;
-            let parsedHeaders = {};
-            let parsedBody;
-            if (applyCurl && curlCommand) {
-                const parsed = parseCurl(curlCommand);
-                method = (_a = parsed.method) !== null && _a !== void 0 ? _a : methodParam;
-                url = (_b = parsed.url) !== null && _b !== void 0 ? _b : urlParam;
-                parsedHeaders = (_c = parsed.headers) !== null && _c !== void 0 ? _c : {};
-                parsedBody = parsed.body;
-            }
             const options = {
-                method: method,
+                method: methodParam,
                 url,
                 headers: {},
                 json: true,
@@ -269,20 +234,13 @@ class Trcloud {
                     options.headers[header.name] = header.value;
                 }
             }
-            for (const [key, value] of Object.entries(parsedHeaders)) {
-                if (!options.headers[key]) {
-                    options.headers[key] = value;
-                }
-            }
-            if (method === 'POST') {
-                const sendBody = this.getNodeParameter('sendBody', i, false) || !!parsedBody;
+            if (methodParam === 'POST') {
+                const sendBody = this.getNodeParameter('sendBody', i, false);
                 if (sendBody) {
                     const bodyMode = this.getNodeParameter('bodyMode', i, 'json');
                     if (bodyMode === 'json' || bodyMode === 'form-urlencoded') {
                         const bodyParameters = this.getNodeParameter('bodyParameters', i, {});
-                        const body = parsedBody
-                            ? JSON.parse(parsedBody)
-                            : {};
+                        const body = {};
                         if (bodyParameters.parameters) {
                             for (const parameter of bodyParameters.parameters) {
                                 body[parameter.name] = parameter.value;
@@ -291,16 +249,16 @@ class Trcloud {
                         if (bodyMode === 'json') {
                             options.body = body;
                             options.json = true;
-                            (_d = (_f = options.headers)['Content-Type']) !== null && _d !== void 0 ? _d : (_f['Content-Type'] = 'application/json');
+                            (_a = (_c = options.headers)['Content-Type']) !== null && _a !== void 0 ? _a : (_c['Content-Type'] = 'application/json');
                         }
                         else {
                             options.form = body;
                             options.json = true;
-                            (_e = (_g = options.headers)['Content-Type']) !== null && _e !== void 0 ? _e : (_g['Content-Type'] = 'application/x-www-form-urlencoded');
+                            (_b = (_d = options.headers)['Content-Type']) !== null && _b !== void 0 ? _b : (_d['Content-Type'] = 'application/x-www-form-urlencoded');
                         }
                     }
                     else if (bodyMode === 'raw') {
-                        const rawBody = parsedBody !== null && parsedBody !== void 0 ? parsedBody : this.getNodeParameter('rawBody', i);
+                        const rawBody = this.getNodeParameter('rawBody', i);
                         const rawContentType = this.getNodeParameter('rawContentType', i);
                         options.body = rawBody;
                         options.json = false;
@@ -339,30 +297,5 @@ function buildTrcloudUrl(baseUrl, midPath, endpointPath) {
     const normalizedMid = `/${midPath.replace(/^\/+|\/+$/g, '')}/`;
     const normalizedEndpoint = endpointPath.replace(/^\/+/, '');
     return `${normalizedBase}${normalizedMid}${normalizedEndpoint}`;
-}
-function parseCurl(command) {
-    var _a, _b, _c;
-    const headers = {};
-    let body;
-    let url;
-    let method;
-    const methodMatch = command.match(/-X\s+([A-Z]+)/i);
-    if (methodMatch) {
-        method = methodMatch[1].toUpperCase();
-    }
-    const urlMatch = (_a = command.match(/curl\s+['"]?(https?:\/\/[^\s'"]+)/i)) !== null && _a !== void 0 ? _a : command.match(/(https?:\/\/[^\s'"]+)/i);
-    if (urlMatch) {
-        url = urlMatch[1];
-    }
-    const headerRegex = /-H\s+['"]?([^:'"]+):\s*([^'"]+)['"]?/gi;
-    let headerMatch;
-    while ((headerMatch = headerRegex.exec(command)) !== null) {
-        headers[headerMatch[1]] = headerMatch[2];
-    }
-    const bodyMatch = (_c = (_b = command.match(/--data-raw\s+(['"])([\s\S]*?)\1/i)) !== null && _b !== void 0 ? _b : command.match(/--data\b\s+(['"])([\s\S]*?)\1/i)) !== null && _c !== void 0 ? _c : command.match(/-d\s+(['"])([\s\S]*?)\1/i);
-    if (bodyMatch) {
-        body = bodyMatch[2];
-    }
-    return { method, url, headers, body };
 }
 //# sourceMappingURL=Trcloud.node.js.map

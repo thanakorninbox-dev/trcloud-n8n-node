@@ -15,8 +15,7 @@ export class Trcloud implements INodeType {
 		icon: 'file:trcloud.svg',
 		group: ['transform'],
 		version: 1,
-		subtitle:
-			'={{$parameter["method"] + " " + $parameter["baseUrl"] + $parameter["midPath"] + $parameter["endpointPath"]}}',
+		subtitle: 'HTTP Request',
 		description: 'Make an HTTP request to any Trcloud endpoint',
 		defaults: {
 			name: 'Trcloud',
@@ -33,41 +32,6 @@ export class Trcloud implements INodeType {
 					{ name: 'GET', value: 'GET' },
 				],
 				default: 'POST',
-			},
-			{
-				displayName: 'Import from cURL',
-				name: 'useCurl',
-				type: 'boolean',
-				default: false,
-				description: 'Toggle to import request details from a cURL command',
-			},
-			{
-				displayName: 'cURL Command',
-				name: 'curlCommand',
-				type: 'string',
-				typeOptions: {
-					rows: 3,
-				},
-				default: '',
-				description:
-					'Optional cURL command to import (method, URL, headers, and body will be parsed)',
-				displayOptions: {
-					show: {
-						useCurl: [true],
-					},
-				},
-			},
-			{
-				displayName: 'Apply cURL',
-				name: 'applyCurl',
-				type: 'boolean',
-				default: false,
-				description: 'Enable to apply the cURL command to this request (method, URL, headers, body)',
-				displayOptions: {
-					show: {
-						useCurl: [true],
-					},
-				},
 			},
 			{
 				displayName: 'Base URL',
@@ -90,7 +54,7 @@ export class Trcloud implements INodeType {
 				displayName: 'Endpoint Path',
 				name: 'endpointPath',
 				type: 'string',
-				default: 'so/read.php',
+				default: '',
 				placeholder: 'so/read.php',
 				required: true,
 				description: 'Document/action path, e.g. so/read.php',
@@ -99,7 +63,7 @@ export class Trcloud implements INodeType {
 				displayName: 'Send Headers',
 				name: 'sendHeaders',
 				type: 'boolean',
-				default: false,
+				default: true,
 			},
 			{
 				displayName: 'Headers',
@@ -109,7 +73,14 @@ export class Trcloud implements INodeType {
 					multipleValues: true,
 				},
 				placeholder: 'Add Header',
-				default: {},
+				default: {
+					parameters: [
+						{
+							name: 'Origin',
+							value: '',
+						},
+					],
+				},
 				displayOptions: {
 					show: {
 						sendHeaders: [true],
@@ -124,13 +95,14 @@ export class Trcloud implements INodeType {
 								displayName: 'Name',
 								name: 'name',
 								type: 'string',
-								default: '',
+								default: 'Origin',
 							},
 							{
 								displayName: 'Value',
 								name: 'value',
 								type: 'string',
 								default: '',
+								placeholder: 'http://localhost',
 							},
 						],
 					},
@@ -140,7 +112,7 @@ export class Trcloud implements INodeType {
 				displayName: 'Send Body',
 				name: 'sendBody',
 				type: 'boolean',
-				default: false,
+				default: true,
 				displayOptions: {
 					show: {
 						method: ['POST'],
@@ -181,7 +153,14 @@ export class Trcloud implements INodeType {
 					multipleValues: true,
 				},
 				placeholder: 'Add Parameter',
-				default: {},
+				default: {
+					parameters: [
+						{
+							name: 'json',
+							value: '',
+						},
+					],
+				},
 				options: [
 					{
 						name: 'parameters',
@@ -246,32 +225,14 @@ export class Trcloud implements INodeType {
 			const baseUrl = this.getNodeParameter('baseUrl', i) as string;
 			const midPath = this.getNodeParameter('midPath', i) as string;
 			const endpointPath = this.getNodeParameter('endpointPath', i) as string;
-			const urlParam = buildTrcloudUrl(baseUrl, midPath, endpointPath);
-			const useCurl = this.getNodeParameter('useCurl', i, false) as boolean;
-			const applyCurl = this.getNodeParameter('applyCurl', i, false) as boolean;
-			const curlCommand = useCurl
-				? ((this.getNodeParameter('curlCommand', i, '') as string) || '').trim()
-				: '';
+			const url = buildTrcloudUrl(baseUrl, midPath, endpointPath);
 			const sendHeaders = this.getNodeParameter('sendHeaders', i, false) as boolean;
 			const headers = this.getNodeParameter('headers', i, {}) as {
 				parameters?: Array<{ name: string; value: string }>;
 			};
 
-			let method = methodParam;
-			let url = urlParam;
-			let parsedHeaders: Record<string, string> = {};
-			let parsedBody: string | undefined;
-
-			if (applyCurl && curlCommand) {
-				const parsed = parseCurl(curlCommand);
-				method = parsed.method ?? methodParam;
-				url = parsed.url ?? urlParam;
-				parsedHeaders = parsed.headers ?? {};
-				parsedBody = parsed.body;
-			}
-
 			const options: IHttpRequestOptions = {
-				method: method as IHttpRequestMethods,
+				method: methodParam as IHttpRequestMethods,
 				url,
 				headers: {},
 				json: true,
@@ -283,15 +244,8 @@ export class Trcloud implements INodeType {
 				}
 			}
 
-			// Merge any headers imported from cURL (node params take precedence)
-			for (const [key, value] of Object.entries(parsedHeaders)) {
-				if (!(options.headers as Record<string, string>)[key]) {
-					(options.headers as Record<string, string>)[key] = value;
-				}
-			}
-
-			if (method === 'POST') {
-				const sendBody = this.getNodeParameter('sendBody', i, false) as boolean || !!parsedBody;
+			if (methodParam === 'POST') {
+				const sendBody = this.getNodeParameter('sendBody', i, false) as boolean;
 				if (sendBody) {
 					const bodyMode = this.getNodeParameter('bodyMode', i, 'json') as string;
 
@@ -299,14 +253,13 @@ export class Trcloud implements INodeType {
 						const bodyParameters = this.getNodeParameter('bodyParameters', i, {}) as {
 							parameters?: Array<{ name: string; value: string }>;
 						};
-						const body: Record<string, string> = parsedBody
-							? (JSON.parse(parsedBody) as Record<string, string>)
-							: {};
+						const body: Record<string, string> = {};
 						if (bodyParameters.parameters) {
 							for (const parameter of bodyParameters.parameters) {
 								body[parameter.name] = parameter.value;
 							}
 						}
+
 						if (bodyMode === 'json') {
 							options.body = body;
 							options.json = true;
@@ -318,7 +271,7 @@ export class Trcloud implements INodeType {
 								'application/x-www-form-urlencoded';
 						}
 					} else if (bodyMode === 'raw') {
-						const rawBody = parsedBody ?? (this.getNodeParameter('rawBody', i) as string);
+						const rawBody = this.getNodeParameter('rawBody', i) as string;
 						const rawContentType = this.getNodeParameter('rawContentType', i) as string;
 						options.body = rawBody;
 						options.json = false;
@@ -358,47 +311,5 @@ function buildTrcloudUrl(baseUrl: string, midPath: string, endpointPath: string)
 	const normalizedMid = `/${midPath.replace(/^\/+|\/+$/g, '')}/`;
 	const normalizedEndpoint = endpointPath.replace(/^\/+/, '');
 	return `${normalizedBase}${normalizedMid}${normalizedEndpoint}`;
-}
-
-function parseCurl(command: string): {
-	method?: string;
-	url?: string;
-	headers?: Record<string, string>;
-	body?: string;
-} {
-	const headers: Record<string, string> = {};
-	let body: string | undefined;
-	let url: string | undefined;
-	let method: string | undefined;
-
-	// Method
-	const methodMatch = command.match(/-X\s+([A-Z]+)/i);
-	if (methodMatch) {
-		method = methodMatch[1].toUpperCase();
-	}
-
-	// URL (first argument after curl or any https?://)
-	const urlMatch = command.match(/curl\s+['"]?(https?:\/\/[^\s'"]+)/i) ?? command.match(/(https?:\/\/[^\s'"]+)/i);
-	if (urlMatch) {
-		url = urlMatch[1];
-	}
-
-	// Headers (-H 'Key: Value')
-	const headerRegex = /-H\s+['"]?([^:'"]+):\s*([^'"]+)['"]?/gi;
-	let headerMatch;
-	while ((headerMatch = headerRegex.exec(command)) !== null) {
-		headers[headerMatch[1]] = headerMatch[2];
-	}
-
-	// Body (-d/--data etc.)
-	const bodyMatch =
-		command.match(/--data-raw\s+(['"])([\s\S]*?)\1/i) ??
-		command.match(/--data\b\s+(['"])([\s\S]*?)\1/i) ??
-		command.match(/-d\s+(['"])([\s\S]*?)\1/i);
-	if (bodyMatch) {
-		body = bodyMatch[2];
-	}
-
-	return { method, url, headers, body };
 }
 
