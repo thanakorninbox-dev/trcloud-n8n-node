@@ -64,7 +64,7 @@ export class Trcloud implements INodeType {
 				displayName: 'Send Headers',
 				name: 'sendHeaders',
 				type: 'boolean',
-				default: true,
+				default: false,
 			},
 			{
 				displayName: 'Headers',
@@ -74,14 +74,7 @@ export class Trcloud implements INodeType {
 					multipleValues: true,
 				},
 				placeholder: 'Add Header',
-				default: {
-					parameters: [
-						{
-							name: 'Origin',
-							value: '',
-						},
-					],
-				},
+				default: {},
 				displayOptions: {
 					show: {
 						sendHeaders: [true],
@@ -147,7 +140,7 @@ export class Trcloud implements INodeType {
 					show: {
 						sendBody: [true],
 						bodyMode: ['json', 'form-urlencoded'],
-						method: ['POST', 'PUT', 'PATCH', 'DELETE'],
+						method: ['POST'],
 					},
 				},
 				typeOptions: {
@@ -278,11 +271,17 @@ export class Trcloud implements INodeType {
 
 			try {
 				const response = await this.helpers.httpRequest.call(this, options);
-				let parsedResponse = response;
+				let parsedResponse: IDataObject;
 				if (typeof response === 'string') {
-					parsedResponse = JSON.parse(response);
+					try {
+						parsedResponse = JSON.parse(response);
+					} catch {
+						parsedResponse = { raw: response };
+					}
+				} else {
+					parsedResponse = response as IDataObject;
 				}
-				returnData.push({ json: parsedResponse as IDataObject });
+				returnData.push({ json: parsedResponse });
 			} catch (error) {
 				if (this.continueOnFail()) {
 					returnData.push({

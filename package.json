@@ -3,7 +3,7 @@
     "version": "0.1.0",
     "description": "trcloud app integration",
     "license": "MIT",
-    "homepage": "",
+    "homepage": "https://github.com/thanakorninbox-dev/trcloud-n8n-node#readme",
     "keywords": [
         "n8n-community-node-package"
     ],
@@ -15,6 +15,10 @@
         "type": "git",
         "url": "https://github.com/thanakorninbox-dev/trcloud-n8n-node.git"
     },
+    "bugs": {
+        "url": "https://github.com/thanakorninbox-dev/trcloud-n8n-node/issues",
+        "email": "ts_nok@hotmail.com"
+    },
     "scripts": {
         "build": "n8n-node build",
         "build:watch": "tsc --watch",
@@ -25,28 +29,24 @@
         "prepublishOnly": "n8n-node prerelease"
     },
     "files": [
-        "dist",
-        "nodes",
-        "credentials"
+        "dist"
     ],
     "n8n": {
         "n8nNodesApiVersion": 1,
         "strict": true,
-        "credentials": [
-            "dist/credentials/TrcloudApi.credentials.js"
-        ],
         "nodes": [
             "dist/nodes/Trcloud/Trcloud.node.js"
         ]
     },
     "devDependencies": {
-        "@n8n/node-cli": "*",
+        "@n8n/node-cli": "^0.17.0",
         "eslint": "9.32.0",
         "prettier": "3.6.2",
         "release-it": "^19.0.4",
         "typescript": "^5.9.2"
     },
     "peerDependencies": {
+        "n8n-core": "*",
         "n8n-workflow": "*"
     }
 }

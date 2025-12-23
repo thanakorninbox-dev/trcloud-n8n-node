@@ -4,11 +4,6 @@
     "codexVersion": "1.0",
     "categories": ["Development", "Developer Tools"],
     "resources": {
-        "credentialDocumentation": [
-            {
-                "url": "https://trcloud.co"
-            }
-        ],
         "primaryDocumentation": [
             {
                 "url": "https://github.com/thanakorninbox-dev/trcloud-n8n-node"

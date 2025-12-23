@@ -58,7 +58,7 @@ class Trcloud {
                     displayName: 'Send Headers',
                     name: 'sendHeaders',
                     type: 'boolean',
-                    default: true,
+                    default: false,
                 },
                 {
                     displayName: 'Headers',
@@ -68,14 +68,7 @@ class Trcloud {
                         multipleValues: true,
                     },
                     placeholder: 'Add Header',
-                    default: {
-                        parameters: [
-                            {
-                                name: 'Origin',
-                                value: '',
-                            },
-                        ],
-                    },
+                    default: {},
                     displayOptions: {
                         show: {
                             sendHeaders: [true],
@@ -141,7 +134,7 @@ class Trcloud {
                         show: {
                             sendBody: [true],
                             bodyMode: ['json', 'form-urlencoded'],
-                            method: ['POST', 'PUT', 'PATCH', 'DELETE'],
+                            method: ['POST'],
                         },
                     },
                     typeOptions: {
@@ -264,9 +257,17 @@ class Trcloud {
             }
             try {
                 const response = await this.helpers.httpRequest.call(this, options);
-                let parsedResponse = response;
+                let parsedResponse;
                 if (typeof response === 'string') {
-                    parsedResponse = JSON.parse(response);
+                    try {
+                        parsedResponse = JSON.parse(response);
+                    }
+                    catch {
+                        parsedResponse = { raw: response };
+                    }
+                }
+                else {
+                    parsedResponse = response;
                 }
                 returnData.push({ json: parsedResponse });
             }
