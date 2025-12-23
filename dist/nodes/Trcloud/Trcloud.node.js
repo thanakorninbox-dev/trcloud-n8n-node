@@ -9,6 +9,7 @@ class Trcloud {
             icon: 'file:trcloud.svg',
             group: ['transform'],
             version: 1,
+            usableAsTool: true,
             subtitle: 'HTTP Request',
             description: 'Make an HTTP request to any Trcloud endpoint',
             defaults: {
@@ -112,7 +113,7 @@ class Trcloud {
                             method: ['POST'],
                         },
                     },
-                    description: 'Enable to include a request body (or import from cURL)',
+                    description: 'Whether to include a request body',
                 },
                 {
                     displayName: 'Body Mode',
@@ -147,14 +148,7 @@ class Trcloud {
                         multipleValues: true,
                     },
                     placeholder: 'Add Parameter',
-                    default: {
-                        parameters: [
-                            {
-                                name: 'json',
-                                value: '',
-                            },
-                        ],
-                    },
+                    default: {},
                     options: [
                         {
                             name: 'parameters',

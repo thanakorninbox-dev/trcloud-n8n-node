@@ -6,6 +6,17 @@ class TrcloudApi {
         this.name = 'trcloudApi';
         this.displayName = 'Trcloud API';
         this.documentationUrl = 'https://trcloud.co';
+        this.icon = {
+            light: 'file:icons/trcloud.svg',
+            dark: 'file:icons/trcloud.dark.svg',
+        };
+        this.testedBy = ['trcloud'];
+        this.test = {
+            request: {
+                baseURL: 'https://demo.trcloud.co',
+                url: '/',
+            },
+        };
         this.properties = [
             {
                 displayName: 'API Key',
