@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Trcloud = void 0;
+const crypto_1 = require("crypto");
 class Trcloud {
     constructor() {
         this.description = {
@@ -17,6 +18,12 @@ class Trcloud {
             },
             inputs: ['main'],
             outputs: ['main'],
+            credentials: [
+                {
+                    name: 'trcloudApi',
+                    required: true,
+                },
+            ],
             properties: [
                 {
                     displayName: 'Method',
@@ -203,6 +210,14 @@ class Trcloud {
         const items = this.getInputData();
         const returnData = [];
         for (let i = 0; i < items.length; i++) {
+            const credentials = await this.getCredentials('trcloudApi');
+            const companyId = credentials.company_id;
+            const passkey = credentials.passkey;
+            const encryptHead = credentials.encrypt_head;
+            const timestamp = Math.floor(new Date().getTime() / 1000);
+            const securekey = (0, crypto_1.createHash)('md5')
+                .update(encryptHead + 't' + timestamp)
+                .digest('hex');
             const methodParam = this.getNodeParameter('method', i);
             const baseUrl = this.getNodeParameter('baseUrl', i);
             const midPath = this.getNodeParameter('midPath', i);
@@ -213,7 +228,9 @@ class Trcloud {
             const options = {
                 method: methodParam,
                 url,
-                headers: {},
+                headers: {
+                    'encrypt-head': encryptHead,
+                },
                 json: true,
             };
             if (sendHeaders && headers.parameters) {
@@ -227,12 +244,45 @@ class Trcloud {
                     const bodyMode = this.getNodeParameter('bodyMode', i, 'json');
                     if (bodyMode === 'json' || bodyMode === 'form-urlencoded') {
                         const bodyParameters = this.getNodeParameter('bodyParameters', i, {});
-                        const body = {};
+                        const jsonBody = {
+                            company_id: companyId,
+                            passkey: passkey,
+                            securekey: securekey,
+                            timestamp: timestamp,
+                        };
                         if (bodyParameters.parameters) {
                             for (const parameter of bodyParameters.parameters) {
-                                body[parameter.name] = parameter.value;
+                                let value = parameter.value;
+                                if (typeof value === 'string' && value.trim().startsWith('{')) {
+                                    try {
+                                        value = JSON.parse(value);
+                                        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                                            Object.assign(jsonBody, value);
+                                            continue;
+                                        }
+                                    }
+                                    catch {
+                                    }
+                                }
+                                if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
+                                    const numValue = Number(value);
+                                    if (!isNaN(numValue)) {
+                                        value = numValue;
+                                    }
+                                }
+                                if (typeof value === 'string') {
+                                    const lowerValue = value.toLowerCase().trim();
+                                    if (lowerValue === 'true')
+                                        value = true;
+                                    if (lowerValue === 'false')
+                                        value = false;
+                                }
+                                jsonBody[parameter.name] = value;
                             }
                         }
+                        const body = {
+                            json: JSON.stringify(jsonBody),
+                        };
                         if (bodyMode === 'json') {
                             options.body = body;
                             options.json = true;

@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-trcloud",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "description": "trcloud app integration",
     "license": "MIT",
     "homepage": "https://github.com/thanakorninbox-dev/trcloud-n8n-node#readme",
@@ -36,10 +36,14 @@
         "strict": true,
         "nodes": [
             "dist/nodes/Trcloud/Trcloud.node.js"
+        ],
+        "credentials": [
+            "dist/nodes/Trcloud/TrcloudApi.credentials.js"
         ]
     },
     "devDependencies": {
         "@n8n/node-cli": "^0.17.0",
+        "@types/node": "^25.0.3",
         "eslint": "9.32.0",
         "prettier": "3.6.2",
         "release-it": "^19.0.4",

@@ -7,6 +7,7 @@ import {
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
+import { createHash } from 'crypto';
 
 export class Trcloud implements INodeType {
 	description: INodeTypeDescription = {
@@ -23,6 +24,12 @@ export class Trcloud implements INodeType {
 		},
 		inputs: ['main'],
 		outputs: ['main'],
+		credentials: [
+			{
+				name: 'trcloudApi',
+				required: true,
+			},
+		],
 		properties: [
 			{
 				displayName: 'Method',
@@ -208,6 +215,18 @@ export class Trcloud implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 
 		for (let i = 0; i < items.length; i++) {
+			// Get credentials
+			const credentials = await this.getCredentials('trcloudApi');
+			const companyId = credentials.company_id as string;
+			const passkey = credentials.passkey as string;
+			const encryptHead = credentials.encrypt_head as string;
+
+			// Compute timestamp and securekey
+			const timestamp = Math.floor(new Date().getTime() / 1000);
+			const securekey = createHash('md5')
+				.update(encryptHead + 't' + timestamp)
+				.digest('hex');
+
 			const methodParam = this.getNodeParameter('method', i) as string;
 			const baseUrl = this.getNodeParameter('baseUrl', i) as string;
 			const midPath = this.getNodeParameter('midPath', i) as string;
@@ -221,7 +240,9 @@ export class Trcloud implements INodeType {
 			const options: IHttpRequestOptions = {
 				method: methodParam as IHttpRequestMethods,
 				url,
-				headers: {},
+				headers: {
+					'encrypt-head': encryptHead,
+				},
 				json: true,
 			};
 
@@ -240,12 +261,58 @@ export class Trcloud implements INodeType {
 						const bodyParameters = this.getNodeParameter('bodyParameters', i, {}) as {
 							parameters?: Array<{ name: string; value: string }>;
 						};
-						const body: Record<string, string> = {};
+						
+						// Start with authentication fields from credentials
+						const jsonBody: IDataObject = {
+							company_id: companyId,
+							passkey: passkey,
+							securekey: securekey,
+							timestamp: timestamp,
+						};
+
+						// Merge user-provided parameters (user can override auth fields if needed)
 						if (bodyParameters.parameters) {
 							for (const parameter of bodyParameters.parameters) {
-								body[parameter.name] = parameter.value;
+								let value: string | number | boolean | IDataObject = parameter.value;
+								
+								// Try to parse as JSON if it looks like JSON
+								if (typeof value === 'string' && value.trim().startsWith('{')) {
+									try {
+										value = JSON.parse(value);
+										// If parsed successfully and it's an object, merge its properties
+										if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+											Object.assign(jsonBody, value);
+											continue; // Skip adding the parameter name itself
+										}
+									} catch {
+										// If parsing fails, use the original string value
+									}
+								}
+								
+								// Try to convert numeric strings to numbers
+								if (typeof value === 'string' && /^-?\d+$/.test(value.trim())) {
+									const numValue = Number(value);
+									if (!isNaN(numValue)) {
+										value = numValue;
+									}
+								}
+								
+								// Convert boolean strings to booleans
+								if (typeof value === 'string') {
+									const lowerValue = value.toLowerCase().trim();
+									if (lowerValue === 'true') value = true;
+									if (lowerValue === 'false') value = false;
+								}
+								
+								jsonBody[parameter.name] = value;
 							}
 						}
+
+						// Wrap in "json" parameter as per TRCLOUD API format
+						// The json field must be a STRING representation of the JSON object
+						const body: IDataObject = {
+							json: JSON.stringify(jsonBody),
+						};
 
 						if (bodyMode === 'json') {
 							options.body = body;
